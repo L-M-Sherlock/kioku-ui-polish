@@ -1,9 +1,11 @@
 /* A compact, finger-friendly deck list. Leave wide desktop windows unchanged. */
 @media (max-width: 600px) {
-    body { margin: 0; }
+    body { margin: 0 !important; }
     body > center > table {
         display: block;
-        width: 100%;
+        width: 100% !important;
+        max-width: 100%;
+        box-sizing: border-box;
         padding: 0 !important;
         border: 0 !important;
         border-radius: 0 !important;
@@ -19,13 +21,13 @@
     body > center > table tr.top-level-drag-row td {
         display: block;
         height: 4px;
-        padding: 0;
+        padding: 0 !important;
         line-height: 0;
         overflow: hidden;
     }
     body > center > table tr.deck {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) repeat(3, 34px) 36px;
+        grid-template-columns: minmax(0, 1fr) repeat(3, minmax(24px, 34px)) 36px;
         align-items: stretch;
         min-height: 48px;
         border-bottom: 1px solid var(--border-subtle, #ddd);
@@ -37,7 +39,7 @@
         align-items: center;
         justify-content: flex-end;
         min-width: 0;
-        padding: 0 2px;
+        padding: 0 2px !important;
         border: 0;
         border-radius: 0;
         font-size: 12px;
@@ -46,10 +48,18 @@
     body > center > table tr.deck td.decktd {
         justify-content: flex-start;
         max-width: none;
-        padding: 0;
+        padding: 0 !important;
         overflow: hidden;
         font-size: 15px;
         font-weight: 600;
+    }
+    /* Anki emits six non-breaking spaces per level. Limit their width so
+       deeply nested decks still have room for their name and controls. */
+    .decktd .kioku-deck-indent {
+        display: inline-block;
+        flex: 0 0 var(--kioku-deck-indent);
+        overflow: hidden;
+        font-size: 0;
     }
     .decktd .collapse {
         box-sizing: border-box;
@@ -82,7 +92,7 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    body > center > table tr.deck td.opts { justify-content: center; padding: 0; }
+    body > center > table tr.deck td.opts { justify-content: center; padding: 0 !important; }
     .opts a {
         display: flex;
         width: 36px;
