@@ -27,7 +27,9 @@
     }
     body > center > table tr.deck {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) repeat(3, minmax(24px, 34px)) 44px;
+        /* Keep the three counts together at their natural widths, so small
+           numbers do not reserve space for five-digit values on every row. */
+        grid-template-columns: minmax(0, 1fr) repeat(3, max-content) 44px;
         align-items: stretch;
         min-height: 48px;
         border-bottom: 1px solid var(--border-subtle, #ddd);
@@ -50,13 +52,13 @@
         max-width: none;
         padding: 0 !important;
         overflow: hidden;
-        font-size: 15px;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: 700;
     }
-    /* Five-digit counts must fit without overlapping the next column. */
+    /* A little space separates counts without forcing fixed-width columns. */
     body > center > table tr.deck td[align="end"] {
-        padding: 0 1px !important;
-        font-size: 11px;
+        padding: 0 2px !important;
+        font-size: clamp(11px, 4vw, 13px);
     }
     /* Anki emits six non-breaking spaces per level. Limit their width so
        deeply nested decks still have room for their name and controls. */

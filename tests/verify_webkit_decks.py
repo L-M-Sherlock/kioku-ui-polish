@@ -32,12 +32,13 @@ html = ("<!doctype html><html><head><style>" + base + "</style><style>"
         + '<tr class="top-level-drag-row"><td colspan="6">&nbsp;</td></tr>')
 for number in range(1, 9):
     indent = "&nbsp;" * 6 * (number - 1)
+    new, learn, review = ("12345", "12345", "12345") if number in (4, 7) else ("5", "1", "40")
     html += (f'<tr class="deck" id="{number}"><td class="decktd" colspan="5">{indent}'
              f'<a class="collapse" href="#" onclick="return pycmd(\'collapse:{number}\')">+</a>'
              f'<a class="deck" href="#" onclick="return pycmd(\'open:{number}\')">Long 日本語 Deck Name</a></td>'
-             '<td align="end"><span class="new-count">12345</span></td>'
-             '<td align="end"><span class="learn-count">16</span></td>'
-             '<td align="end"><span class="review-count">12345</span></td>'
+             f'<td align="end"><span class="new-count">{new}</span></td>'
+             f'<td align="end"><span class="learn-count">{learn}</span></td>'
+             f'<td align="end"><span class="review-count">{review}</span></td>'
              f'<td class="opts"><a onclick="return pycmd(\'opts:{number}\')"><img class="gears"></a></td></tr>')
 html += '</table><div id="studiedToday">Studied 0 cards today.</div></center></body></html>'
 
@@ -51,7 +52,9 @@ function verify(theme) {
         const box = row.getBoundingClientRect();
         const option = row.querySelector('.opts a').getBoundingClientRect();
         const indent = row.querySelector('.kioku-deck-indent');
-        const name = row.querySelector('a.deck').getBoundingClientRect();
+        const link = row.querySelector('a.deck'), name = link.getBoundingClientRect();
+        const nameStyle = getComputedStyle(link);
+        check(parseFloat(nameStyle.fontSize) === 18 && Number(nameStyle.fontWeight) >= 700, 'deck name typography');
         check(box.left >= 0 && box.right <= width + 0.5, 'row clipped');
         check(option.width >= 44 && option.height >= 44 && option.right <= width + 0.5, 'options clipped');
         check(name.width > 0, 'deck name missing');
@@ -59,17 +62,25 @@ function verify(theme) {
         for (const count of row.querySelectorAll('td span[class$="count"]')) {
             const range = document.createRange(); range.selectNodeContents(count);
             const text = range.getBoundingClientRect(), cell = count.closest('td').getBoundingClientRect();
+            const expectedSize = Math.min(13, Math.max(11, innerWidth * 0.04));
+            check(Math.abs(parseFloat(getComputedStyle(count).fontSize) - expectedSize) < 0.1, 'count typography');
             check(text.left >= cell.left - 0.5 && text.right <= cell.right + 0.5, 'count overflow');
         }
     }
     check(table.scrollWidth <= table.clientWidth + 1, 'table overflow');
 }
 verify('light'); verify('dark');
+const wideCount = rows[6].querySelector('.new-count').closest('td').getBoundingClientRect().width;
+const narrowCount = rows[7].querySelector('.new-count').closest('td').getBoundingClientRect().width;
+check(narrowCount < wideCount, 'counts still use fixed column widths');
+check(rows[7].querySelector('a.deck').getBoundingClientRect().width >
+      rows[6].querySelector('a.deck').getBoundingClientRect().width, 'compact counts did not free space');
 rows[7].querySelector('.learn-count').click();
 rows[3].querySelector('a.collapse').click();
 rows[1].querySelector('.opts a').click();
 check(calls.join(',') === 'open:8,collapse:4,opts:2', 'incorrect action');
-return JSON.stringify({width: innerWidth, themes: 'light/dark', actions: calls});
+return JSON.stringify({width: innerWidth, themes: 'light/dark',
+    singleDigitCell: narrowCount, fiveDigitCell: wideCount, actions: calls});
 })()"""
 
 with tempfile.TemporaryDirectory() as tmp:
