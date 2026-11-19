@@ -17,7 +17,8 @@ class DeckBrowser:
 
 
 class ReviewerBottomBar:
-    pass
+    def __init__(self, reviewer):
+        self.reviewer = reviewer
 
 
 class Web:
@@ -45,7 +46,7 @@ class Toolbar:
 
 class ToolbarHooksTest(unittest.TestCase):
     def setUp(self):
-        hooks = types.SimpleNamespace(webview_will_set_content=[], top_toolbar_did_init_links=[], state_did_change=[],
+        hooks = types.SimpleNamespace(webview_will_set_content=[], webview_did_receive_js_message=[], top_toolbar_did_init_links=[], state_did_change=[],
                                       undo_state_did_change=[], browser_will_show=[], operation_did_execute=[],
                                       state_did_undo=lambda out: self.undo_events.append(out),
                                       reviewer_will_show_context_menu=lambda *args: None)
@@ -53,6 +54,7 @@ class ToolbarHooksTest(unittest.TestCase):
         self.aqt.gui_hooks = hooks
         self.aqt.mw = types.SimpleNamespace(state="deckBrowser", reviewer=types.SimpleNamespace(card=None))
         self.aqt.mw.toolbar = Toolbar(self.aqt.mw)
+        self.aqt.mw.bottomWeb = Web()
         self.aqt.mw.edits = 0
         self.aqt.mw.undo_enabled = False
         self.undo_events = []
@@ -160,6 +162,7 @@ class ToolbarHooksTest(unittest.TestCase):
         self.aqt.mw.undo_enabled = True
         self.hooks.undo_state_did_change[0](self.aqt.mw.undo_actions_info())
         self.assertIn('"kioku-can-undo", true', toolbar.web.scripts[-1])
+        self.assertIn('"kioku-can-undo", true', self.aqt.mw.bottomWeb.scripts[-1])
         self.assertIn('aria-disabled', toolbar.web.scripts[-1])
         self.assertIn('Undo review', toolbar.web.scripts[-1])
         action()
@@ -180,6 +183,38 @@ class ToolbarHooksTest(unittest.TestCase):
         self.aqt.mw.state = "overview"
         action()
         self.assertEqual(len(self.operations), 1)
+
+    def test_bottom_undo_uses_existing_undo_and_respects_other_messages(self):
+        context = ReviewerBottomBar(types.SimpleNamespace(mw=self.aqt.mw))
+        hook = self.hooks.webview_did_receive_js_message[0]
+        self.aqt.mw.state = "review"
+        self.aqt.mw.undo_enabled = True
+        self.assertEqual(hook((False, None), "other", context), (False, None))
+        self.assertEqual(hook((True, "handled"), "kioku:bottom-undo", context), (True, "handled"))
+        self.assertEqual(hook((False, None), "kioku:bottom-undo", object()), (False, None))
+        self.assertEqual(hook((False, None), "kioku:bottom-undo", context), (True, None))
+        self.assertEqual(len(self.operations), 1)
+        self.assertIs(self.operations[0].initiator, self.plugin._TOOLBAR_UNDO)
+
+    def test_bottom_content_initializes_undo_state(self):
+        context = ReviewerBottomBar(types.SimpleNamespace(mw=self.aqt.mw))
+        html = types.SimpleNamespace(head="")
+        self.hooks.webview_will_set_content[0](html, context)
+        self.assertIn('kioku-bottom-undo', html.head)
+        self.assertIn('kioku:bottom-undo', html.head)
+        self.assertIn('"kioku-can-undo", false', html.head)
+
+    def test_toolbar_resize_requests_height_update_only_in_review(self):
+        toolbar = self.aqt.mw.toolbar
+        context = TopToolbar(toolbar)
+        hook = self.hooks.webview_did_receive_js_message[0]
+        self.aqt.mw.state = "review"
+        self.assertEqual(hook((False, None), "kioku:toolbar-resize", context), (True, None))
+        self.assertEqual(toolbar.web.resizes, 1)
+        self.aqt.mw.state = "overview"
+        self.assertEqual(hook((False, None), "kioku:toolbar-resize", context), (True, None))
+        self.assertEqual(toolbar.web.resizes, 1)
+        self.assertEqual(hook((False, None), "kioku:toolbar-resize", object()), (False, None))
 
     def test_only_our_undo_refreshes_a_deferred_reviewer(self):
         class Window:

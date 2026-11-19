@@ -1,112 +1,110 @@
-/* A compact, finger-friendly deck list. Leave wide desktop windows unchanged. */
-@media (max-width: 600px) {
-    body { margin: 0 !important; }
-    body > center > table {
-        display: block;
-        width: 100% !important;
-        max-width: 100%;
-        box-sizing: border-box;
-        padding: 0 !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        background: transparent !important;
-    }
-    body > center > table > tbody { display: block; }
-    body > center > table tr:has(> th) { display: none; }
-    body > center > table tr.top-level-drag-row {
-        display: block;
-        height: 4px;
-    }
-    body > center > table tr.top-level-drag-row td {
-        display: block;
-        height: 4px;
-        padding: 0 !important;
-        line-height: 0;
-        overflow: hidden;
-    }
-    body > center > table tr.deck {
-        display: grid;
-        /* Keep the three counts together at their natural widths, so small
-           numbers do not reserve space for five-digit values on every row. */
-        grid-template-columns: minmax(0, 1fr) repeat(3, max-content) 44px;
-        align-items: stretch;
-        min-height: 48px;
-        border-bottom: 1px solid var(--border-subtle, #ddd);
-    }
-    body > center > table tr.deck td,
-    body.fancy > center > table tr.deck td {
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        min-width: 0;
-        padding: 0 2px !important;
-        border: 0;
-        border-radius: 0;
-        font-size: 12px;
-        white-space: nowrap;
-    }
-    body > center > table tr.deck td.decktd {
-        justify-content: flex-start;
-        max-width: none;
-        padding: 0 !important;
-        overflow: hidden;
-        font-size: 18px;
-        font-weight: 700;
-    }
-    /* A little space separates counts without forcing fixed-width columns. */
-    body > center > table tr.deck td[align="end"] {
-        padding: 0 2px !important;
-        font-size: clamp(11px, 4vw, 13px);
-    }
-    /* Anki emits six non-breaking spaces per level. Limit their width so
-       deeply nested decks still have room for their name and controls. */
-    .decktd .kioku-deck-indent {
-        display: inline-block;
-        flex: 0 0 var(--kioku-deck-indent);
-        overflow: hidden;
-        font-size: 0;
-    }
-    .decktd .collapse {
-        box-sizing: border-box;
-        display: inline-flex;
-        flex: 0 0 44px;
-        align-items: center;
-        justify-content: center;
-        width: 44px;
-        min-height: 48px;
-        color: inherit;
-        font-size: 0;
-        text-decoration: none;
-    }
-    .decktd a.collapse::before {
-        content: "›";
-        font-size: 25px;
-        font-weight: 400;
-        line-height: 1;
-    }
-    .decktd a.collapse[data-kioku-expanded="true"]::before {
-        transform: rotate(90deg);
-    }
-    .decktd a.deck {
-        display: block;
-        flex: 1 1 auto;
-        min-width: 0;
-        padding: 15px 0;
-        overflow: hidden;
-        text-align: start;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    body > center > table tr.deck td.opts { justify-content: center; padding: 0 !important; }
-    .opts a {
-        display: flex;
-        width: 44px;
-        min-height: 48px;
-        align-items: center;
-        justify-content: center;
-    }
-    .opts .gears { visibility: visible; width: 16px; height: 16px; padding: 0; }
-    #studiedToday { margin: 1em; font-size: 13px; }
+/* A compact, finger-friendly deck list at phone and tablet widths. */
+body { margin: 0 !important; }
+body > center > table {
+    display: block;
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
 }
+body > center > table > tbody { display: block; }
+body > center > table tr:has(> th) { display: none; }
+body > center > table tr.top-level-drag-row {
+    display: block;
+    height: 4px;
+}
+body > center > table tr.top-level-drag-row td {
+    display: block;
+    height: 4px;
+    padding: 0 !important;
+    line-height: 0;
+    overflow: hidden;
+}
+body > center > table tr.deck {
+    display: grid;
+    /* Keep the three counts together at their natural widths, so small
+       numbers do not reserve space for five-digit values on every row. */
+    grid-template-columns: minmax(0, 1fr) repeat(3, max-content) 44px;
+    align-items: stretch;
+    min-height: 48px;
+    border-bottom: 1px solid var(--border-subtle, #ddd);
+}
+body > center > table tr.deck td,
+body.fancy > center > table tr.deck td {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    padding: 0 2px !important;
+    border: 0;
+    border-radius: 0;
+    font-size: 12px;
+    white-space: nowrap;
+}
+body > center > table tr.deck td.decktd {
+    justify-content: flex-start;
+    max-width: none;
+    padding: 0 !important;
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 700;
+}
+/* A little space separates counts without forcing fixed-width columns. */
+body > center > table tr.deck td[align="end"] {
+    padding: 0 2px !important;
+    font-size: clamp(11px, 4vw, 13px);
+}
+/* Anki emits six non-breaking spaces per level. Limit their width so
+   deeply nested decks still have room for their name and controls. */
+.decktd .kioku-deck-indent {
+    display: inline-block;
+    flex: 0 0 var(--kioku-deck-indent);
+    overflow: hidden;
+    font-size: 0;
+}
+.decktd .collapse {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 48px;
+    color: inherit;
+    font-size: 0;
+    text-decoration: none;
+}
+.decktd a.collapse::before {
+    content: "›";
+    font-size: 25px;
+    font-weight: 400;
+    line-height: 1;
+}
+.decktd a.collapse[data-kioku-expanded="true"]::before {
+    transform: rotate(90deg);
+}
+.decktd a.deck {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 15px 0;
+    overflow: hidden;
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body > center > table tr.deck td.opts { justify-content: center; padding: 0 !important; }
+.opts a {
+    display: flex;
+    width: 44px;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+}
+.opts .gears { visibility: visible; width: 16px; height: 16px; padding: 0; }
+#studiedToday { margin: 1em; font-size: 13px; }

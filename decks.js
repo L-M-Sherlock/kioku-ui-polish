@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", function () {
         arrow.setAttribute("aria-expanded", String(expanded));
     });
     document.addEventListener("click", function (event) {
-        if (!window.matchMedia("(max-width: 600px)").matches || event.shiftKey ||
+        if (event.shiftKey ||
             event.defaultPrevented || event.target.closest("a, button, input, select, textarea")) {
             return;
         }

@@ -24,6 +24,13 @@ html.kioku-review-toolbar #kioku-undo-current,
 html.kioku-review-toolbar #kioku-review-more { display: inline-block; }
 #kioku-undo-current { opacity: 0.4; pointer-events: none; }
 html.kioku-can-undo #kioku-undo-current { opacity: 1; pointer-events: auto; }
+@media (min-width: 584px) {
+    html.kioku-review-toolbar #stats,
+    html.kioku-review-toolbar #sync { display: inline-block; }
+    html.kioku-review-toolbar #kioku-edit-current,
+    html.kioku-review-toolbar #kioku-undo-current,
+    html.kioku-review-toolbar #kioku-review-more { display: none; }
+}
 """
 
 
@@ -128,14 +135,18 @@ def _set_undo_state(web, can_undo, description=""):
     disabled = "false" if can_undo else "true"
     web.eval(
         f'document.documentElement.classList.toggle("kioku-can-undo", {on});'
-        'var undoButton=document.getElementById("kioku-undo-current");'
+        'var undoButton=document.getElementById("kioku-undo-current")||document.getElementById("kioku-bottom-undo");'
         f'if(undoButton){{undoButton.setAttribute("aria-disabled", {json.dumps(disabled)});'
-        f'undoButton.setAttribute("title", {json.dumps(description)});}}'
+        f'undoButton.setAttribute("title", {json.dumps(description)});'
+        f'if(undoButton.tagName === "BUTTON") undoButton.disabled = {"false" if can_undo else "true"};}}'
     )
 
 
 def _undo_state_changed(info):
-    _set_undo_state(aqt.mw.toolbar.web, info.can_undo, info.undo_text)
+    mw = aqt.mw
+    _set_undo_state(mw.toolbar.web, info.can_undo, info.undo_text)
+    if mw.state == "review":
+        _set_undo_state(mw.bottomWeb, info.can_undo, info.undo_text)
 
 
 def _update_toolbar_state(_new_state, _old_state):
@@ -146,12 +157,27 @@ def _update_toolbar_state(_new_state, _old_state):
     web.eval(f'document.documentElement.classList.toggle("kioku-review-toolbar", {on});')
     info = mw.undo_actions_info()
     _set_undo_state(web, info.can_undo, info.undo_text)
+    if mw.state == "review":
+        _set_undo_state(mw.bottomWeb, info.can_undo, info.undo_text)
     web.adjustHeightToFit()
 
 
 def _style_web_content(web_content, context):
     if isinstance(context, ReviewerBottomBar):
-        web_content.head += f"\n<style>{_REVIEW_CSS}</style>\n"
+        can_undo = context.reviewer.mw.undo_actions_info().can_undo
+        label = json.dumps(tr.undo_undo()).replace("</", "<\\/")
+        on = "true" if can_undo else "false"
+        web_content.head += f"\n<style>{_REVIEW_CSS}</style>\n" + (
+            '<script>document.documentElement.classList.toggle("kioku-can-undo", ' + on + ');'
+            'document.addEventListener("DOMContentLoaded",function(){'
+            'var cells=document.querySelectorAll("#innertable > tbody > tr > td.stat");'
+            'if(cells.length<2)return;var button=document.createElement("button");'
+            'button.id="kioku-bottom-undo";button.type="button";button.textContent=' + label + ';'
+            'button.disabled=!document.documentElement.classList.contains("kioku-can-undo");'
+            'button.setAttribute("aria-disabled",String(button.disabled));'
+            'button.onclick=function(){return pycmd("kioku:bottom-undo");};'
+            'cells[cells.length-1].appendChild(button);});</script>\n'
+        )
     elif isinstance(context, DeckBrowser):
         web_content.head += f"\n<style>{_DECK_CSS}</style>\n<script>{_DECK_JS}</script>\n"
     elif isinstance(context, TopToolbar):
@@ -165,7 +191,10 @@ def _style_web_content(web_content, context):
             'document.addEventListener("DOMContentLoaded",function(){'
             'var button=document.getElementById("kioku-undo-current");'
             'if(button)button.setAttribute("aria-disabled",'
-            'String(!document.documentElement.classList.contains("kioku-can-undo")));});</script>\n'
+            'String(!document.documentElement.classList.contains("kioku-can-undo")));'
+            'var width=window.innerWidth;window.addEventListener("resize",function(){'
+            'if(window.innerWidth===width)return;width=window.innerWidth;'
+            'if(typeof pycmd==="function")pycmd("kioku:toolbar-resize");});});</script>\n'
         )
 
 
@@ -273,6 +302,20 @@ def _add_browser_columns(browser):
         _install_compact_menubar(browser.form.menubar)
 
 
+def _bottom_message(handled, message, context):
+    if handled[0]:
+        return handled
+    if message == "kioku:bottom-undo" and isinstance(context, ReviewerBottomBar):
+        _undo(context.reviewer.mw.toolbar)
+        return (True, None)
+    if message == "kioku:toolbar-resize" and isinstance(context, TopToolbar):
+        if context.toolbar.mw.state == "review":
+            context.toolbar.web.adjustHeightToFit()
+        return (True, None)
+    return handled
+
+
+gui_hooks.webview_did_receive_js_message.append(_bottom_message)
 gui_hooks.webview_will_set_content.append(_style_web_content)
 gui_hooks.top_toolbar_did_init_links.append(_add_toolbar_link)
 gui_hooks.state_did_change.append(_update_toolbar_state)

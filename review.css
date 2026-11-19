@@ -1,84 +1,108 @@
 /* Reviewer bottom bar only. Anki's original buttons and commands remain in use. */
-@media (max-width: 600px) {
-    #innertable {
-        height: 90px;
-        table-layout: fixed;
-    }
-
-    #middle {
-        width: 100%;
-        vertical-align: middle;
-    }
-
-    #middle > center, #middle > center > table,
-    #middle > table {
-        width: 100%;
-        table-layout: fixed;
-    }
-
-    #middle td[align="center"] {
-        position: static;
-        padding: 4px;
-        vertical-align: middle;
-    }
-
-    #middle button[data-ease], #middle #ansbut {
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 2px;
-        width: 100%;
-        min-width: 0;
-        height: 72px;
-        margin: 0;
-        padding: 4px 2px;
-        border: 0;
-        border-radius: 9px;
-        box-shadow: none;
-        color: white;
-        font-size: clamp(13px, 4.2vw, 18px);
-        line-height: 1.15;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    #middle button[data-ease] .nobold,
-    #middle #ansbut .stattxt {
-        position: static;
-        display: block;
-        order: -1;
-        transform: none;
-        font-size: 0.82em;
-        line-height: 1.15;
-        white-space: normal;
-    }
-
-    #middle button[data-ease]:active, #middle #ansbut:active {
-        filter: brightness(0.8);
-    }
-
-    /* The scheduler can show two, three, or four grades. Color by position,
-       not by data-ease: for example, ease 2 means Good on a two-button card. */
-    #middle td:has(> button[data-ease]):first-child > button { background: #b12e30; }
-    #middle td:has(> button[data-ease]):last-child > button { background: #0667e8; }
-    #middle td:has(> button[data-ease]):nth-child(2):nth-last-child(3) > button { background: #c77600; }
-    #middle td:has(> button[data-ease]):nth-child(3):nth-last-child(2) > button,
-    #middle td:has(> button[data-ease]):nth-child(2):nth-last-child(2) > button,
-    #middle td:has(> button[data-ease]):nth-child(2):last-child > button { background: #008c00; }
-    /* Neutral surfaces keep the three AnkiDroid-style count colors readable. */
-    #middle #ansbut { background: #e8e8e8; color: #202020; }
-    #middle #ansbut .new-count { color: #1856a6; }
-    #middle #ansbut .learn-count { color: #a72121; }
-    #middle #ansbut .review-count { color: #176b32; }
-
-    .nightMode #middle #ansbut, .night-mode #middle #ansbut {
-        background: #383838;
-        color: #fff;
-    }
-    .nightMode #middle #ansbut .new-count, .night-mode #middle #ansbut .new-count { color: #92c5ff; }
-    .nightMode #middle #ansbut .learn-count, .night-mode #middle #ansbut .learn-count { color: #ff9b9b; }
-    .nightMode #middle #ansbut .review-count, .night-mode #middle #ansbut .review-count { color: #94e0a3; }
+#innertable {
+    height: 90px;
+    table-layout: fixed;
 }
+
+#middle {
+    width: 100%;
+    vertical-align: middle;
+}
+
+#middle > center, #middle > center > table,
+#middle > table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+#middle td[align="center"] {
+    position: static;
+    padding: 4px;
+    vertical-align: middle;
+}
+
+#middle button[data-ease], #middle #ansbut {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-width: 0;
+    height: 72px;
+    margin: 0;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 9px;
+    box-shadow: none;
+    color: white;
+    font-size: clamp(13px, 4.2vw, 18px);
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#middle button[data-ease] .nobold,
+#middle #ansbut .stattxt {
+    position: static;
+    display: block;
+    order: -1;
+    transform: none;
+    font-size: 0.82em;
+    line-height: 1.15;
+    white-space: normal;
+}
+
+#middle button[data-ease]:active, #middle #ansbut:active {
+    filter: brightness(0.8);
+}
+
+/* The scheduler can show two, three, or four grades. Color by position,
+   not by data-ease: for example, ease 2 means Good on a two-button card. */
+#middle td:has(> button[data-ease]):first-child > button { background: #b12e30; }
+#middle td:has(> button[data-ease]):last-child > button { background: #0667e8; }
+#middle td:has(> button[data-ease]):nth-child(2):nth-last-child(3) > button { background: #c77600; }
+#middle td:has(> button[data-ease]):nth-child(3):nth-last-child(2) > button,
+#middle td:has(> button[data-ease]):nth-child(2):nth-last-child(2) > button,
+#middle td:has(> button[data-ease]):nth-child(2):last-child > button { background: #008c00; }
+/* Neutral surfaces keep the three AnkiDroid-style count colors readable. */
+#middle #ansbut { background: #e8e8e8; color: #202020; }
+#middle #ansbut .new-count { color: #1856a6; }
+#middle #ansbut .learn-count { color: #a72121; }
+#middle #ansbut .review-count { color: #176b32; }
+
+.nightMode #middle #ansbut, .night-mode #middle #ansbut {
+    background: #383838;
+    color: #fff;
+}
+.nightMode #middle #ansbut .new-count, .night-mode #middle #ansbut .new-count { color: #92c5ff; }
+.nightMode #middle #ansbut .learn-count, .night-mode #middle #ansbut .learn-count { color: #ff9b9b; }
+.nightMode #middle #ansbut .review-count, .night-mode #middle #ansbut .review-count { color: #94e0a3; }
+
+/* On wide screens Anki shows Edit and More alongside the rating buttons. */
+@media (min-width: 584px) {
+    #innertable { table-layout: auto; }
+    #middle { width: auto; }
+    #innertable td.stat { width: 1%; white-space: nowrap; }
+}
+
+@media (min-width: 584px) {
+    #innertable td.stat { box-sizing: border-box; padding: 4px; vertical-align: middle; }
+    #innertable td.stat > button {
+        box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+        width: 88px; min-width: 0; height: 72px; margin: 0; padding: 4px;
+        border: 0; border-radius: 9px; box-shadow: none;
+        background: #e8e8e8; color: #202020; font-size: 16px; line-height: 1.15;
+    }
+    #innertable td.stat:last-child > button { height: 34px; }
+    #innertable td.stat:last-child > button + button { margin-top: 4px; }
+    #innertable td.stat > button:active { filter: brightness(0.8); }
+    #innertable td.stat > button:disabled { opacity: 0.4; }
+    #innertable #time { position: static; transform: none; margin-left: 3px; font-size: 0.8em; }
+    .nightMode #innertable td.stat > button, .night-mode #innertable td.stat > button {
+        background: #383838; color: #fff;
+    }
+}
+@media (max-width: 583px) { #kioku-bottom-undo { display: none; } }

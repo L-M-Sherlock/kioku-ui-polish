@@ -32,6 +32,7 @@ class QtIntegrationTest(unittest.TestCase):
     def tearDownClass(cls):
         for hook, fn in (
             (aqt.gui_hooks.webview_will_set_content, cls.plugin._style_web_content),
+            (aqt.gui_hooks.webview_did_receive_js_message, cls.plugin._bottom_message),
             (aqt.gui_hooks.top_toolbar_did_init_links, cls.plugin._add_toolbar_link),
             (aqt.gui_hooks.state_did_change, cls.plugin._update_toolbar_state),
             (aqt.gui_hooks.undo_state_did_change, cls.plugin._undo_state_changed),

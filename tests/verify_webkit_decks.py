@@ -89,5 +89,5 @@ with tempfile.TemporaryDirectory() as tmp:
     (tmp / "check.js").write_text(js, encoding="utf-8")
     runner = tmp / "runner"
     subprocess.run(["swiftc", str(ROOT / "tests/webkit_layout_runner.swift"), "-o", str(runner)], check=True)
-    for width in (240, 280, 320, 390, 600):
+    for width in (240, 280, 320, 390, 583, 584, 600, 768, 1024):
         subprocess.run([str(runner), str(width), str(tmp / "fixture.html"), str(tmp / "check.js")], check=True)
