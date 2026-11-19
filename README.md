@@ -29,7 +29,7 @@ Requires Python 3.9 or newer; no third-party packages are needed.
 python3 scripts/build.py
 ```
 
-The package is written to `dist/kioku_ui_polish.ankiaddon`. To publish a release, update `human_version` in `manifest.json`, commit it, and push the matching tag (for example, `v1.1.1`). GitHub Actions checks the tag against the manifest, builds the add-on, and attaches it to a GitHub Release.
+The package is written to `dist/kioku_ui_polish.ankiaddon`. To publish a release, update `human_version` in `manifest.json` and add `release-notes/v1.2.3.md` for that version. Start the file with `## What's new` and describe the user-visible changes. Commit both files and push the matching tag (for example, `v1.2.3`). GitHub Actions validates the tag and notes, builds the add-on, and publishes the curated notes before GitHub's generated changelog. Missing or empty notes stop the release.
 
 ## License
 
