@@ -45,12 +45,21 @@ class Toolbar:
 
 class ToolbarHooksTest(unittest.TestCase):
     def setUp(self):
-        hooks = types.SimpleNamespace(webview_will_set_content=[], top_toolbar_did_init_links=[], state_did_change=[])
+        hooks = types.SimpleNamespace(webview_will_set_content=[], top_toolbar_did_init_links=[], state_did_change=[],
+                                      undo_state_did_change=[], browser_will_show=[], operation_did_execute=[],
+                                      state_did_undo=lambda out: self.undo_events.append(out),
+                                      reviewer_will_show_context_menu=lambda *args: None)
         self.aqt = types.ModuleType("aqt")
         self.aqt.gui_hooks = hooks
         self.aqt.mw = types.SimpleNamespace(state="deckBrowser", reviewer=types.SimpleNamespace(card=None))
         self.aqt.mw.toolbar = Toolbar(self.aqt.mw)
         self.aqt.mw.edits = 0
+        self.aqt.mw.undo_enabled = False
+        self.undo_events = []
+        self.tooltips = []
+        self.warnings = []
+        self.operations = []
+        self.aqt.mw.undo_actions_info = lambda: types.SimpleNamespace(can_undo=self.aqt.mw.undo_enabled, undo_text="Undo review")
 
         def edit():
             self.aqt.mw.edits += 1
@@ -63,9 +72,37 @@ class ToolbarHooksTest(unittest.TestCase):
         toolbar = types.ModuleType("aqt.toolbar")
         toolbar.TopToolbar = TopToolbar
         utils = types.ModuleType("aqt.utils")
-        utils.tr = types.SimpleNamespace(studying_edit=lambda: "Edit")
+        utils.tr = types.SimpleNamespace(studying_edit=lambda: "Edit", studying_more=lambda: "More", undo_undo=lambda: "Undo",
+                                         undo_action_undone=lambda action: action + " undone")
+        utils.tooltip = lambda message, parent: self.tooltips.append((message, parent))
+        utils.showWarning = lambda message, parent: self.warnings.append((message, parent))
+        anki = types.ModuleType("anki")
+        anki.__path__ = []
+        errors = types.ModuleType("anki.errors")
+        errors.UndoEmpty = type("UndoEmpty", (Exception,), {})
+        ops = types.ModuleType("aqt.operations")
+        test = self
+
+        class CollectionOp:
+            def __init__(self, parent, operation):
+                self.parent, self.operation = parent, operation
+
+            def success(self, callback):
+                self.on_success = callback
+                return self
+
+            def failure(self, callback):
+                self.on_failure = callback
+                return self
+
+            def run_in_background(self, *, initiator):
+                self.initiator = initiator
+                test.operations.append(self)
+
+        ops.CollectionOp = CollectionOp
         modules = {"aqt": self.aqt, "aqt.deckbrowser": deck, "aqt.reviewer": reviewer,
-                   "aqt.toolbar": toolbar, "aqt.utils": utils}
+                   "aqt.toolbar": toolbar, "aqt.utils": utils, "aqt.operations": ops,
+                   "anki": anki, "anki.errors": errors}
         self.modules = patch.dict(sys.modules, modules)
         self.modules.start()
         spec = importlib.util.spec_from_file_location("kioku_ui_polish_test", Path(__file__).resolve().parent.parent / "__init__.py")
@@ -98,10 +135,10 @@ class ToolbarHooksTest(unittest.TestCase):
         hook = self.hooks.state_did_change[0]
         self.aqt.mw.state = "review"
         hook("review", "overview")
-        self.assertIn('"kioku-review-toolbar", true', web.scripts[-1])
+        self.assertIn('"kioku-review-toolbar", true', web.scripts[-2])
         self.aqt.mw.state = "deckBrowser"
         hook("overview", "review")  # an inner transition already changed state
-        self.assertIn('"kioku-review-toolbar", false', web.scripts[-1])
+        self.assertIn('"kioku-review-toolbar", false', web.scripts[-2])
         self.assertEqual(web.resizes, 2)
         html = types.SimpleNamespace(head="")
         self.hooks.webview_will_set_content[0](html, TopToolbar(self.aqt.mw.toolbar))
@@ -111,6 +148,134 @@ class ToolbarHooksTest(unittest.TestCase):
         other = types.SimpleNamespace(head="")
         self.hooks.webview_will_set_content[0](other, object())
         self.assertEqual(other.head, "")
+
+    def test_undo_is_only_enabled_when_available_in_review(self):
+        toolbar = self.aqt.mw.toolbar
+        links = []
+        self.hooks.top_toolbar_did_init_links[0](links, toolbar)
+        action = toolbar.links["kioku-undo-current"]
+        self.aqt.mw.state = "review"
+        action()
+        self.assertEqual(len(self.operations), 0)
+        self.aqt.mw.undo_enabled = True
+        self.hooks.undo_state_did_change[0](self.aqt.mw.undo_actions_info())
+        self.assertIn('"kioku-can-undo", true', toolbar.web.scripts[-1])
+        self.assertIn('aria-disabled', toolbar.web.scripts[-1])
+        self.assertIn('Undo review', toolbar.web.scripts[-1])
+        action()
+        self.assertEqual(len(self.operations), 1)
+        operation = self.operations[0]
+        self.assertIs(operation.initiator, self.plugin._TOOLBAR_UNDO)
+        result = object()
+        col = types.SimpleNamespace(undo=lambda: result)
+        self.assertIs(operation.operation(col), result)
+        out = types.SimpleNamespace(operation="Answer Card")
+        operation.on_success(out)
+        self.assertEqual(self.undo_events, [out])
+        self.assertEqual(self.tooltips, [("Answer Card undone", self.aqt.mw)])
+        operation.on_failure(sys.modules["anki.errors"].UndoEmpty())
+        self.assertEqual(self.warnings, [])
+        operation.on_failure(ValueError("failure"))
+        self.assertEqual(self.warnings, [("failure", self.aqt.mw)])
+        self.aqt.mw.state = "overview"
+        action()
+        self.assertEqual(len(self.operations), 1)
+
+    def test_only_our_undo_refreshes_a_deferred_reviewer(self):
+        class Window:
+            def __init__(self, kind):
+                self.kind = kind
+
+            def window(self):
+                return self
+
+            def isVisible(self):
+                return True
+
+            def windowType(self):
+                return self.kind
+
+        class App:
+            modal = popup = focus = active = None
+            activeModalWidget = staticmethod(lambda: App.modal)
+            activePopupWidget = staticmethod(lambda: App.popup)
+            focusWidget = staticmethod(lambda: App.focus)
+            activeWindow = staticmethod(lambda: App.active)
+
+        qt = types.ModuleType("aqt.qt")
+        qt.QApplication = App
+        qt.Qt = types.SimpleNamespace(WindowType=types.SimpleNamespace(ToolTip="tooltip"))
+        reviewer = self.aqt.mw.reviewer
+        reviewer._refresh_needed = True
+        refreshes = []
+        reviewer.refresh_if_needed = lambda: refreshes.append("refresh")
+        self.aqt.mw.state = "review"
+        hook = self.hooks.operation_did_execute[0]
+        with patch.dict(sys.modules, {"aqt.qt": qt}):
+            hook(object(), object())
+            self.assertEqual(refreshes, [])
+            App.focus = Window("tooltip")
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+            self.assertEqual(refreshes, ["refresh"])
+            App.focus = Window("other window")
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+            App.active = self.aqt.mw
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+            self.assertEqual(refreshes, ["refresh", "refresh"])
+            App.active = None
+            App.focus = None
+            App.modal = object()
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+            App.modal = None
+            App.popup = object()
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+            App.popup = None
+            self.aqt.mw.state = "overview"
+            hook(object(), self.plugin._TOOLBAR_UNDO)
+        self.assertEqual(refreshes, ["refresh", "refresh"])
+
+    def test_more_menu_uses_existing_reviewer_actions_and_hook(self):
+        class Point:
+            def __init__(self, x, y):
+                self.x, self.y = x, y
+
+        class Menu:
+            def __init__(self, parent):
+                self.parent = parent
+                self.items = None
+                self.position = None
+
+            def popup(self, position):
+                self.position = position
+
+        qt = types.ModuleType("aqt.qt")
+        qt.QMenu, qt.QPoint = Menu, Point
+        utils = sys.modules["aqt.utils"]
+        utils.qtMenuShortcutWorkaround = lambda menu: setattr(menu, "shortcuts_checked", True)
+        seen = []
+        self.hooks.reviewer_will_show_context_menu = lambda reviewer, menu: seen.append((reviewer, menu))
+        reviewer = self.aqt.mw.reviewer
+        reviewer.card = object()
+        reviewer._contextMenu = lambda: ["existing actions"]
+        reviewer._addMenuItems = lambda menu, rows: setattr(menu, "items", rows)
+        toolbar = self.aqt.mw.toolbar
+        toolbar.web.width = lambda: 320
+        toolbar.web.height = lambda: 44
+        toolbar.web.mapToGlobal = lambda point: (point.x, point.y)
+        links = []
+        self.hooks.top_toolbar_did_init_links[0](links, toolbar)
+        self.aqt.mw.state = "review"
+        with patch.dict(sys.modules, {"aqt.qt": qt}):
+            toolbar.links["kioku-review-more"]()
+        menu = self.aqt.mw._kioku_ui_polish_review_menu
+        self.assertEqual(menu.items, ["existing actions"])
+        self.assertEqual(menu.position, (160, 44))
+        self.assertTrue(menu.shortcuts_checked)
+        self.assertEqual(seen, [(reviewer, menu)])
+        reviewer.card = None
+        with patch.dict(sys.modules, {"aqt.qt": qt}):
+            toolbar.links["kioku-review-more"]()
+        self.assertIs(self.aqt.mw._kioku_ui_polish_review_menu, menu)
 
 
 if __name__ == "__main__":

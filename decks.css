@@ -27,7 +27,7 @@
     }
     body > center > table tr.deck {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) repeat(3, minmax(24px, 34px)) 36px;
+        grid-template-columns: minmax(0, 1fr) repeat(3, minmax(24px, 34px)) 44px;
         align-items: stretch;
         min-height: 48px;
         border-bottom: 1px solid var(--border-subtle, #ddd);
@@ -53,6 +53,11 @@
         font-size: 15px;
         font-weight: 600;
     }
+    /* Five-digit counts must fit without overlapping the next column. */
+    body > center > table tr.deck td[align="end"] {
+        padding: 0 1px !important;
+        font-size: 11px;
+    }
     /* Anki emits six non-breaking spaces per level. Limit their width so
        deeply nested decks still have room for their name and controls. */
     .decktd .kioku-deck-indent {
@@ -64,10 +69,10 @@
     .decktd .collapse {
         box-sizing: border-box;
         display: inline-flex;
-        flex: 0 0 38px;
+        flex: 0 0 44px;
         align-items: center;
         justify-content: center;
-        width: 38px;
+        width: 44px;
         min-height: 48px;
         color: inherit;
         font-size: 0;
@@ -95,7 +100,7 @@
     body > center > table tr.deck td.opts { justify-content: center; padding: 0 !important; }
     .opts a {
         display: flex;
-        width: 36px;
+        width: 44px;
         min-height: 48px;
         align-items: center;
         justify-content: center;
