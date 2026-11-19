@@ -6,9 +6,10 @@ A mobile-focused Anki add-on for [Kioku](https://github.com/krmanik/kioku). It m
 
 - An AnkiDroid-inspired deck list with larger rows, separate expand and options targets, and colored card counts.
 - Compact indentation for deeply nested decks in narrow phone and iPad Split View windows.
+- During review, replace Stats and Sync in the top toolbar with Edit, which opens the current card for editing; the original buttons return on other screens.
 - Larger, color-coded review buttons, including support for two-, three-, and four-button layouts and optional intervals.
 - A neutral Show Answer button with readable card counts in light and dark modes.
-- Changes apply at viewport widths up to 600 CSS pixels; wider windows keep their original layout.
+- The deck list and review button styles apply at viewport widths up to 600 CSS pixels. The review toolbar change applies at all widths.
 
 ## Install
 
