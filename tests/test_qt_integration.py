@@ -10,7 +10,8 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 try:
     import aqt
-    from aqt.qt import QApplication, QGridLayout, QMenu, QTableView, QTimer, QWidget
+    from aqt.qt import QApplication, QFont, QGridLayout, QMenu, QMenuBar, QPoint, QTableView, QToolButton, Qt, QVBoxLayout, QWidget
+    from PyQt6.QtTest import QTest
 except ImportError:
     aqt = None
 
@@ -39,94 +40,143 @@ class QtIntegrationTest(unittest.TestCase):
         ):
             hook.remove(fn)
 
-    def test_columns_button_and_view_action_open_original_menu(self):
-        browser = QWidget()
-        grid = QGridLayout(browser)
-        grid.addWidget(QWidget(browser), 0, 0)
-        grid.addWidget(QWidget(browser), 0, 1)
-        view = QTableView(browser)
-        menu = QMenu(browser)
-        browser.form = types.SimpleNamespace(gridLayout=grid, tableView=view, menuqt_accel_view=menu)
-        called = []
-        browser.table = types.SimpleNamespace(_on_header_context=lambda point: called.append((point.x(), point.y())))
-        self.plugin._add_browser_columns(browser)
-        action, button = browser._kioku_ui_polish_columns
-        self.assertIs(menu.actions()[-1], action)
-        self.assertEqual(button.minimumHeight(), 44)
-        self.assertEqual(grid.indexOf(button), 2)
-        button.click()
-        action.trigger()
-        self.assertEqual(called, [(0, view.horizontalHeader().height())] * 2)
-        browser.close()
-
-    def test_columns_menu_toggles_current_mode(self):
+    def _columns_browser(self):
         from aqt.browser.table.table import Table
 
         browser = QWidget()
         grid = QGridLayout(browser)
         grid.addWidget(QWidget(browser), 0, 0)
         grid.addWidget(QWidget(browser), 0, 1)
+        menubar = QMenuBar(browser)
+        for title in ("Edit", "View", "Notes", "Cards", "Go", "Help"):
+            menubar.addMenu(title)
         view = QTableView(browser)
-        menu = QMenu(browser)
-        browser.form = types.SimpleNamespace(gridLayout=grid, tableView=view, menuqt_accel_view=menu)
+        browser.form = types.SimpleNamespace(gridLayout=grid, tableView=view, menubar=menubar)
         mode = {"current": "cards"}
-        columns = {"cards": ["front", "due"], "notes": ["front", "due"]}
+        columns = {"cards": ["front", "due", "deck"], "notes": ["front", "due", "deck"]}
         state = types.SimpleNamespace(column_label=lambda column: column, column_tooltip=lambda column: "")
-        model = types.SimpleNamespace(columns={"front": "Front", "due": "Due"},
+
+        def toggle(key):
+            active = columns[mode["current"]]
+            if key in active:
+                active.remove(key)
+            else:
+                active.append(key)
+
+        model = types.SimpleNamespace(columns={"front": "Front", "due": "Due", "deck": "Deck"},
                                       active_column_index=lambda key: columns[mode["current"]].index(key)
                                       if key in columns[mode["current"]] else None,
                                       len_columns=lambda: len(columns[mode["current"]]),
-                                      toggle_column=lambda key: columns[mode["current"]].remove(key))
+                                      toggle_column=toggle)
         table = types.SimpleNamespace(_view=view, _state=state, _model=model, browser=browser,
-                                      _set_column_sizes=lambda: None, _set_sort_indicator=lambda: None)
+                                      _set_column_sizes=lambda: None, _set_sort_indicator=lambda: None,
+                                      _scroll_to_column=lambda column: None)
         table._on_column_toggled = lambda checked, key: Table._on_column_toggled(table, checked, key)
-        table._on_header_context = lambda point: Table._on_header_context(table, point)
         browser.table = table
+        return browser, menubar, grid, mode, columns
+
+    def test_columns_menu_follows_help_without_extra_button(self):
+        browser, menubar, grid, mode, columns = self._columns_browser()
         self.plugin._add_browser_columns(browser)
-
-        checked_before = []
-
-        def select_due(_browser, column_menu):
-            def choose():
-                checked_before.append(column_menu.actions()[1].isChecked())
-                column_menu.actions()[1].trigger()
-                column_menu.close()
-            QTimer.singleShot(0, choose)
-
-        aqt.gui_hooks.browser_header_will_show_context_menu.append(select_due)
-        try:
-            browser._kioku_ui_polish_columns[1].click()
-            self.assertEqual(columns, {"cards": ["front"], "notes": ["front", "due"]})
-            mode["current"] = "notes"
-            browser._kioku_ui_polish_columns[1].click()
-            self.assertEqual(columns, {"cards": ["front"], "notes": ["front"]})
-            self.assertEqual(checked_before, [True, True])
-        finally:
-            aqt.gui_hooks.browser_header_will_show_context_menu.remove(select_due)
-            browser.close()
-
-    def test_kioku_phone_layout_keeps_columns_button_clickable(self):
-        try:
-            from kioku.windows import _wrap_search_row
-        except ImportError:
-            self.skipTest("Kioku source is not on PYTHONPATH")
-        browser = QWidget()
-        grid = QGridLayout(browser)
-        grid.addWidget(QWidget(browser), 0, 0)
-        grid.addWidget(QWidget(browser), 0, 1)
-        view = QTableView(browser)
-        menu = QMenu(browser)
-        browser.form = types.SimpleNamespace(gridLayout=grid, tableView=view, menuqt_accel_view=menu)
-        calls = []
-        browser.table = types.SimpleNamespace(_on_header_context=lambda point: calls.append(point.y()))
-        self.plugin._add_browser_columns(browser)
-        button = browser._kioku_ui_polish_columns[1]
-        _wrap_search_row(browser)
-        row = grid.itemAtPosition(1, 0).layout()
-        self.assertIs(row.itemAt(0).widget(), button)
-        button.click()
-        self.assertEqual(calls, [view.horizontalHeader().height()])
+        menu = browser._kioku_ui_polish_columns
+        self.assertEqual([action.text() for action in menubar.actions()],
+                         ["Edit", "View", "Notes", "Cards", "Go", "Help", "Columns"])
+        self.assertIs(menubar.actions()[-1].menu(), menu)
+        self.assertEqual(grid.count(), 2)
+        self.assertEqual(menubar.actions()[1].menu().actions(), [])
         browser.close()
+
+    def test_compact_menubar_fits_then_restores_font_when_widened(self):
+        window = QWidget()
+        layout = QVBoxLayout(window)
+        layout.setContentsMargins(0, 0, 0, 0)
+        menubar = QMenuBar(window)
+        layout.addWidget(menubar)
+        font = QFont(menubar.font())
+        font.setPointSizeF(15)
+        menubar.setFont(font)
+        for title in ("Edit", "View", "Notes", "Cards", "Go", "Help", "Columns"):
+            menubar.addMenu(title)
+        self.plugin._install_compact_menubar(menubar)
+        window.resize(320, 100)
+        window.show()
+        self.app.processEvents()
+        self.app.processEvents()
+        extension = menubar.findChild(QToolButton, "qt_menubar_ext_button")
+        self.assertLessEqual(menubar.sizeHint().width(), menubar.width())
+        self.assertFalse(extension.isVisible())
+        self.assertGreaterEqual(menubar.font().pointSizeF(), 11)
+        window.resize(393, 100)
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assertLessEqual(menubar.sizeHint().width(), menubar.width())
+        self.assertFalse(extension.isVisible())
+        window.resize(700, 100)
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assertEqual(menubar.font().pointSizeF(), 15)
+        window.close()
+
+    def test_compact_menubar_supports_pixel_sized_fonts(self):
+        window = QWidget()
+        layout = QVBoxLayout(window)
+        layout.setContentsMargins(0, 0, 0, 0)
+        menubar = QMenuBar(window)
+        layout.addWidget(menubar)
+        font = QFont(menubar.font())
+        font.setPixelSize(20)
+        menubar.setFont(font)
+        for title in ("Edit", "View", "Notes", "Cards", "Go", "Help", "Columns"):
+            menubar.addMenu(title)
+        self.plugin._install_compact_menubar(menubar)
+        window.resize(320, 100)
+        window.show()
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assertLessEqual(menubar.sizeHint().width(), menubar.width())
+        self.assertGreaterEqual(menubar.font().pixelSize(), 15)
+        window.resize(700, 100)
+        self.app.processEvents()
+        self.app.processEvents()
+        self.assertEqual(menubar.font().pixelSize(), 20)
+        window.close()
+
+    def test_columns_menu_allows_multiple_toggles_in_both_modes(self):
+        browser, menubar, grid, mode, columns = self._columns_browser()
+        self.plugin._add_browser_columns(browser)
+        menu = browser._kioku_ui_polish_columns
+        seen = []
+        hook = lambda _browser, column_menu: seen.append(column_menu)
+        aqt.gui_hooks.browser_header_will_show_context_menu.append(hook)
+        try:
+            for current in ("cards", "notes"):
+                mode["current"] = current
+                menu.popup(QPoint(0, 0))
+                self.app.processEvents()
+                self.assertEqual([action.text() for action in menu.actions()], ["Front", "Due", "Deck"])
+                for index in (1, 2):
+                    action = menu.actions()[index]
+                    self.assertTrue(action.isChecked())
+                    QTest.mouseClick(menu, Qt.MouseButton.LeftButton,
+                                     pos=menu.actionGeometry(action).center())
+                    self.app.processEvents()
+                    self.assertFalse(action.isChecked())
+                    self.assertTrue(menu.isVisible())
+                self.assertEqual(columns[current], ["front"])
+                # Anki's last-column guard must retain the checkmark.
+                with patch("aqt.browser.table.table.showInfo") as warning:
+                    action = menu.actions()[0]
+                    QTest.mouseClick(menu, Qt.MouseButton.LeftButton,
+                                     pos=menu.actionGeometry(action).center())
+                    self.app.processEvents()
+                    self.assertTrue(action.isChecked())
+                    self.assertEqual(columns[current], ["front"])
+                    warning.assert_called_once()
+                menu.close()
+            self.assertEqual(seen, [menu, menu])
+        finally:
+            aqt.gui_hooks.browser_header_will_show_context_menu.remove(hook)
+            browser.close()
 
     def test_more_menu_uses_reviewer_and_keeps_it_alive(self):
         parent = QWidget()

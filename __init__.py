@@ -1,6 +1,7 @@
 """Mobile-friendly review buttons and deck list for Kioku."""
 
 import json
+import sys
 from pathlib import Path
 
 import aqt
@@ -168,30 +169,108 @@ def _style_web_content(web_content, context):
         )
 
 
+def _install_compact_menubar(bar):
+    """Fit the browser menus on a phone while preserving larger text if possible."""
+    from aqt.qt import QEvent, QFont, QObject, QTimer
+
+    class FitMenuBar(QObject):
+        def __init__(self):
+            super().__init__(bar)
+            self.font = QFont(bar.font())
+            self.style = bar.styleSheet()
+            self.last = None
+            self.pending = False
+
+        def eventFilter(self, obj, event):
+            if event.type() in (QEvent.Type.Show, QEvent.Type.Resize,
+                                QEvent.Type.ActionAdded, QEvent.Type.ActionRemoved):
+                if not self.pending:
+                    self.pending = True
+                    QTimer.singleShot(0, self.fit)
+            return False
+
+        def fit(self):
+            self.pending = False
+            try:
+                width = bar.width()
+                key = (width, tuple(action.text() for action in bar.actions()))
+                if width <= 0 or key == self.last:
+                    return
+                self.last = key
+                bar.setStyleSheet(self.style + ("\nQMenuBar::item { padding: 3px 1px; }" if width < 600 else ""))
+                bar.setFont(self.font)
+                if width >= 600:
+                    return
+                font = QFont(self.font)
+                size = font.pointSizeF()
+                if size > 0:
+                    minimum = min(size, 11.0)
+                    while size > minimum and bar.sizeHint().width() > width:
+                        size = max(minimum, size - 0.5)
+                        font.setPointSizeF(size)
+                        bar.setFont(font)
+                elif font.pixelSize() > 0:
+                    pixels = font.pixelSize()
+                    minimum = min(pixels, 15)
+                    while pixels > minimum and bar.sizeHint().width() > width:
+                        pixels -= 1
+                        font.setPixelSize(pixels)
+                        bar.setFont(font)
+            except RuntimeError:
+                # The browser may have closed while the queued fit was waiting.
+                return
+
+    fitter = FitMenuBar()
+    bar.installEventFilter(fitter)
+    bar._kioku_ui_polish_menu_fit = fitter
+
+
 def _add_browser_columns(browser):
     from anki.lang import current_lang
-    from aqt.qt import QAction, QPoint, QPushButton
+    from aqt.qt import QMenu, QSignalBlocker, Qt
 
     label = "列" if current_lang.lower().startswith("zh") else "Columns"
 
-    def show_columns():
-        table = browser.table
-        view = browser.form.tableView
-        # The existing menu builds the correct columns for the current
-        # Cards/Notes mode, preserves add-on hooks, and saves the selection.
-        table._on_header_context(QPoint(0, view.horizontalHeader().height()))
+    class ColumnsMenu(QMenu):
+        def mouseReleaseEvent(self, event):
+            action = self.actionAt(event.pos())
+            if (event.button() == Qt.MouseButton.LeftButton and action is not None
+                    and action.isEnabled() and action.isCheckable() and action.menu() is None):
+                # A normal QMenu closes on every selection. Keep it open for
+                # consecutive column changes; other menu actions stay normal.
+                action.trigger()
+                event.accept()
+                return
+            super().mouseReleaseEvent(event)
 
-    action = QAction(label + "…", browser)
-    action.triggered.connect(lambda _checked=False: show_columns())
-    browser.form.menuqt_accel_view.addAction(action)
-    button = QPushButton(label + "…", browser)
-    button.setObjectName("kiokuColumnsButton")
-    button.setMinimumHeight(44)
-    button.clicked.connect(lambda _checked=False: show_columns())
-    grid = browser.form.gridLayout
-    grid.addWidget(button, 0, grid.columnCount())
-    # Qt parents own these objects; retain Python references as well.
-    browser._kioku_ui_polish_columns = (action, button)
+    menu = ColumnsMenu(label, browser)
+    menu.setObjectName("kiokuColumnsMenu")
+    menu.setToolTipsVisible(True)
+
+    def fill_columns():
+        menu.clear()
+        table = browser.table
+        for key, column in table._model.columns.items():
+            action = menu.addAction(table._state.column_label(column))
+            action.setCheckable(True)
+            action.setChecked(table._model.active_column_index(key) is not None)
+            action.setToolTip(table._state.column_tooltip(column))
+
+            def toggle(checked, key=key, action=action):
+                table._on_column_toggled(checked, key)
+                # Anki refuses to hide the last column. Keep the menu's
+                # checkmark consistent with the actual model in that case.
+                with QSignalBlocker(action):
+                    action.setChecked(table._model.active_column_index(key) is not None)
+
+            action.toggled.connect(toggle)
+        gui_hooks.browser_header_will_show_context_menu(browser, menu)
+
+    menu.aboutToShow.connect(fill_columns)
+    browser.form.menubar.addMenu(menu)
+    browser._kioku_ui_polish_columns = menu
+    if sys.platform in ("ios", "android"):
+        _install_compact_menubar(browser.form.menubar)
 
 
 gui_hooks.webview_will_set_content.append(_style_web_content)
